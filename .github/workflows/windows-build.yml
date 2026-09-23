@@ -19,29 +19,45 @@ jobs:
         with:
           dotnet-version: "8.0.x"
 
+      # Find Vaani.csproj wherever it lives (repo root or a subfolder like windows/).
+      - name: Locate project
+        id: proj
+        shell: bash
+        run: |
+          CSPROJ=$(find . -iname 'Vaani.csproj' | head -1)
+          if [ -z "$CSPROJ" ]; then
+            echo "::error::Vaani.csproj not found in the repo. .csproj files present:"
+            find . -name '*.csproj' || true
+            exit 1
+          fi
+          DIR=$(dirname "$CSPROJ")
+          echo "csproj=$CSPROJ" >> "$GITHUB_OUTPUT"
+          echo "dir=$DIR" >> "$GITHUB_OUTPUT"
+          echo "Found project: $CSPROJ (dir: $DIR)"
+
       # The Whisper model is large; cache it between runs.
       - name: Cache Whisper model
         id: model-cache
         uses: actions/cache@v4
         with:
-          path: windows/models/ggml-small.bin
+          path: ${{ steps.proj.outputs.dir }}/models/ggml-small.bin
           key: vaani-whisper-small-v1
 
       - name: Download Whisper model
         if: steps.model-cache.outputs.cache-hit != 'true'
         shell: bash
         run: |
-          mkdir -p windows/models
-          curl -L --fail -o windows/models/ggml-small.bin \
+          mkdir -p "${{ steps.proj.outputs.dir }}/models"
+          curl -L --fail -o "${{ steps.proj.outputs.dir }}/models/ggml-small.bin" \
             "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin?download=true"
-          ls -lh windows/models
+          ls -lh "${{ steps.proj.outputs.dir }}/models"
 
       - name: Restore
-        run: dotnet restore windows/Vaani.csproj
+        run: dotnet restore "${{ steps.proj.outputs.csproj }}"
 
       - name: Publish (self-contained single-file .exe)
         run: >
-          dotnet publish windows/Vaani.csproj
+          dotnet publish "${{ steps.proj.outputs.csproj }}"
           -c Release
           -r win-x64
           --self-contained true
@@ -53,7 +69,7 @@ jobs:
         shell: pwsh
         run: |
           if (-not (Test-Path "publish/ggml-small.bin")) {
-            Copy-Item "windows/models/ggml-small.bin" "publish/ggml-small.bin"
+            Copy-Item "${{ steps.proj.outputs.dir }}/models/ggml-small.bin" "publish/ggml-small.bin"
           }
           Get-ChildItem publish | Select-Object Name, Length
 
