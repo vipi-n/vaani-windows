@@ -22,6 +22,15 @@
     <PackageReference Include="NAudio" Version="2.2.1" />
   </ItemGroup>
 
+  <!-- Using both WPF + WinForms makes several type names ambiguous
+       (Application, Rectangle, Color, Point, Clipboard, ...). We drop the
+       auto-imported WinForms/Drawing global usings; the code fully-qualifies
+       those types explicitly (WinForms.* alias and System.Drawing.*). -->
+  <ItemGroup>
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
+  </ItemGroup>
+
   <!-- The Whisper model is downloaded during CI and placed in models/.
        It is copied next to the executable so the app is fully offline. -->
   <ItemGroup>
